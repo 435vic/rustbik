@@ -20,7 +20,7 @@ vec4 sticker(vec4 colors, vec2 uv) {
 
 void main() {
     vec4 surface_color = sticker(col, uvs);
-    vec3 normal = normalize(gl_FrontFacing ? nor : -nor);
+    //vec3 normal = normalize(gl_FrontFacing ? nor : -nor);
     // outColor.rgb = calculate_lighting(cameraPosition, surface_color.rgb, pos, normal, 0.0, 1.0, 1.0);
     outColor.rgb = surface_color.rgb;
     outColor.a = 1.0;

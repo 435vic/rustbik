@@ -22,6 +22,11 @@ fn performance() -> Performance {
        .expect("Performance should exist")
 }
 
+pub struct ProgramInput {
+    pub frame_time: f64,
+    pub time: f64,
+}
+
 /// A WebGL2 wrapper for a canvas element.
 pub struct Canvas {
     canvas: HtmlCanvasElement,
@@ -76,7 +81,7 @@ impl Canvas {
         Viewport::new_at_origo(w, h)
     }
 
-    pub fn run(&self, mut program: impl 'static + FnMut(f64)) {
+    pub fn run(&self, mut program: impl 'static + FnMut(ProgramInput)) {
         let closure = Rc::new(RefCell::new(None));
         let closure2 = closure.clone();
 
@@ -88,7 +93,10 @@ impl Canvas {
             let frame_time = performance().now() - last_time;
             elapsed_time += frame_time;
             last_time = performance().now();
-            program(elapsed_time);
+            program(ProgramInput {
+                time: elapsed_time,
+                frame_time
+            });
             request_animation_frame(closure.borrow().as_ref().unwrap());
         }));
 

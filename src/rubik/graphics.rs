@@ -73,7 +73,8 @@ impl Material for RubikMaterial {
     fn fragment_attributes(&self) -> FragmentAttributes {
         FragmentAttributes {
             color: true,
-            normal: true,
+            // TODO: Switch to true when using lights
+            normal: false,
             uv: true,
             position: true,
             ..FragmentAttributes::NONE

@@ -14,6 +14,10 @@ interface CanvasOptions {
     depth?: bool,
     stencil?: bool,
     premultipliedAlpha?: bool,
+    failIfMajorPerformanceCaveat?: bool,
+    desynchronized?: bool,
+    powerPreference?: "default" | "high-performance" | "low-power",
+    preserveDrawingBuffer?: bool,
 }
 "#;
 
@@ -39,6 +43,7 @@ pub fn rotate_camera_around_target(
     let dir = (target - camera.position()).normalize();
     let horizontal = dir.cross(*camera.up());
     let vertical = horizontal.cross(dir);
+    
     for i in 0..2 {
         let axis = if i == 0 { vertical } else { horizontal };
         let angle = if i == 0 { theta } else { phi };
@@ -78,10 +83,13 @@ pub fn bind(canvas_element: HtmlCanvasElement, opts: Option<CanvasOptions>) -> R
     );
     let light = DirectionalLight::new(&context, 100.0, Srgba::WHITE, &Vec3::new(1.0, 3.0, 2.5));
 
+    window.run(move |input| {
+        let t = input.time as f32;
+        let dt = input.frame_time as f32;
 
-    window.run(move |elapsed_time| {
-        let t = elapsed_time as f32;
-        rotate_camera_around_target(&mut camera, Vec3::zero(), (t/6000.0).sin()/300.0, (t/10000.0).cos()/800.0);
+        let theta_speed = (t/10000.0).sin()/5000.0;
+        let phi_speed = (t/10000.0).cos()/8000.0;
+        rotate_camera_around_target(&mut camera, Vec3::zero(), dt*theta_speed, dt*phi_speed);
 
         RenderTarget::screen(&context, width, height)
             .clear(ClearState::color_and_depth(0.0, 0.0, 0.0, 0.0, 1.0))
