@@ -23,6 +23,7 @@ void main() {
     vec3 normal = normalize(gl_FrontFacing ? nor : -nor);
     // outColor.rgb = calculate_lighting(cameraPosition, surface_color.rgb, pos, normal, 0.0, 1.0, 1.0);
     outColor.rgb = surface_color.rgb;
+    outColor.a = 1.0;
     // outColor.rgb = outColor.rgb * cel_shading(vec3(1.0, 1.0, 1.0), normalize(vec3(1.0, 1.0, 1.0)), normal, vec3(0.0, 1.0, 0.0));
     // outColor.rgb = tone_mapping(outColor.rgb);
     // outColor.rgb = color_mapping(outColor.rgb);

@@ -7,6 +7,13 @@ edition = "2021"
 crate-type = ["cdylib"]
 
 [dependencies]
+console_error_panic_hook = { version = "0.1.7", optional = true }
 three-d = { version = "0.17.0", default-features = false }
 wasm-bindgen = "0.2.92"
-web-sys = { version = "0.3.69", features = ["WebGl2RenderingContext", "HtmlCanvasElement"] }
+web-sys = { version = "0.3.69", features = ["WebGl2RenderingContext", "HtmlCanvasElement", "Window", "Performance"] }
+
+[profile.release]
+opt-level = "s"
+
+[features]
+debug = ["dep:console_error_panic_hook"]

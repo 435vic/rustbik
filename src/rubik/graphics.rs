@@ -81,7 +81,7 @@ impl Material for RubikMaterial {
     }
 
     fn use_uniforms(&self, program: &Program, camera: &Camera, _: &[&dyn Light]) {
-        camera.color_mapping.use_uniforms(program);
+        // camera.color_mapping.use_uniforms(program);
         program.use_uniform("stickerData", Vec2::new(1.0 - self.margin, self.radius));
         // program.use_uniform("cameraPosition", camera.position());
 

@@ -1,9 +1,26 @@
+use std::cell::RefCell;
+use std::rc::Rc;
 use std::sync::Arc;
 
-use three_d::{Context, context};
+use three_d::{context, Context, Viewport};
+use wasm_bindgen::closure::Closure;
 use wasm_bindgen::JsValue;
-use web_sys::{HtmlCanvasElement, WebGl2RenderingContext};
+use web_sys::{HtmlCanvasElement, Performance, WebGl2RenderingContext};
 use wasm_bindgen::JsCast;
+
+fn request_animation_frame(closure: &Closure<dyn FnMut()>) {
+    web_sys::window()
+        .expect("Global window object should exist")
+        .request_animation_frame(closure.as_ref().unchecked_ref())
+        .unwrap();
+}
+
+fn performance() -> Performance {
+    web_sys::window()
+       .expect("Global window object should exist")
+       .performance()
+       .expect("Performance should exist")
+}
 
 /// A WebGL2 wrapper for a canvas element.
 pub struct Canvas {
@@ -44,5 +61,37 @@ impl Canvas {
                 )).map_err(|e| format!("three_d::core failed to create context: {:?}", e))?
             }
         )
+    }
+
+    pub fn gl(&self) -> Context {
+        self.context.clone()
+    }
+
+    pub fn logical_size(&self) -> (u32, u32) {
+        (self.canvas.client_width() as u32, self.canvas.client_height() as u32)
+    }
+
+    pub fn viewport(&self) -> Viewport {
+        let (w, h) = self.logical_size();
+        Viewport::new_at_origo(w, h)
+    }
+
+    pub fn run(&self, mut program: impl 'static + FnMut(f64)) {
+        let closure = Rc::new(RefCell::new(None));
+        let closure2 = closure.clone();
+
+        let mut elapsed_time = 0.0;
+        let mut last_time = 0.0;
+        *closure2.borrow_mut() = Some(Closure::new(move || {
+            // TODO: add exit condition
+            // Need to drop handle on closure with closure.borrow_mut.take()
+            let frame_time = performance().now() - last_time;
+            elapsed_time += frame_time;
+            last_time = performance().now();
+            program(elapsed_time);
+            request_animation_frame(closure.borrow().as_ref().unwrap());
+        }));
+
+        request_animation_frame(closure2.borrow().as_ref().unwrap());
     }
 }

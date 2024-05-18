@@ -1,6 +1,6 @@
 use std::collections::VecDeque;
 
-use three_d::{CpuMesh, Mat3, Mat4, Mesh, Rad, SquareMatrix, Srgba, Vec3};
+use three_d::{CpuMesh, Mat3, Mat4, Mesh, Object, Rad, SquareMatrix, Srgba, Vec3};
 
 mod piece;
 mod graphics;
@@ -202,7 +202,7 @@ impl Default for CubeAnimationOptions {
 }
 
 impl Cube {
-    pub fn from_facelet_str(fstr: String, anim: CubeAnimationOptions, ctx: &three_d::Context) -> Result<Cube, String> {
+    pub fn from_facelet_str(ctx: &three_d::Context, fstr: String, anim: CubeAnimationOptions) -> Result<Cube, String> {
         let mut pieces = vec![];
         for i in 0..27 {
             let position = (i as i32 / 9 - 1, 2 - (i as i32 / 3) % 3 - 1, i as i32 % 3 - 1);
@@ -367,7 +367,19 @@ impl Cube {
         }
     }
 
-    pub fn solved(anim: CubeAnimationOptions, ctx: &three_d::Context) -> Cube {
-        Self::from_facelet_str("BBBBBBBBBYYYYYYYYYRRRRRRRRRWWWWWWWWWGGGGGGGGGOOOOOOOOO".to_string(), anim, ctx).unwrap()
+    pub fn solved(ctx: &three_d::Context, anim: CubeAnimationOptions) -> Cube {
+        Self::from_facelet_str(ctx, "BBBBBBBBBYYYYYYYYYRRRRRRRRRWWWWWWWWWGGGGGGGGGOOOOOOOOO".to_string(), anim).unwrap()
+    }
+}
+
+impl<'a> IntoIterator for &'a Cube {
+    type Item = &'a dyn Object;
+    type IntoIter = std::vec::IntoIter<&'a dyn Object>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.pieces.iter()
+            .map(|p| p as &dyn Object)
+            .collect::<Vec<_>>()
+            .into_iter()
     }
 }
