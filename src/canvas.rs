@@ -57,7 +57,7 @@ impl Canvas {
         wglctx
             .get_extension("OES_texture_half_float_linear")
             .map_err(|e| format!("extension OES_texture_half_float_linear not available: {:?}", e))?;
-        
+
         Ok(
             Self {
                 canvas,

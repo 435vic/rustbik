@@ -94,6 +94,7 @@ impl Geometry for Piece {
     }
 
     fn render_with_material(&self, material: &dyn three_d::Material, camera: &three_d::Camera, lights: &[&dyn three_d::Light]) {
+
         self.gm.render_with_material(material, camera, lights);
     }
 

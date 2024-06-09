@@ -43,7 +43,7 @@ pub fn rotate_camera_around_target(
     let dir = (target - camera.position()).normalize();
     let horizontal = dir.cross(*camera.up());
     let vertical = horizontal.cross(dir);
-    
+
     for i in 0..2 {
         let axis = if i == 0 { vertical } else { horizontal };
         let angle = if i == 0 { theta } else { phi };
@@ -70,7 +70,7 @@ pub fn bind(canvas_element: HtmlCanvasElement, opts: Option<CanvasOptions>) -> R
         .map_err(|e| JsValue::from(e))?;
     let (width, height) = window.logical_size();
     let context = window.gl();
-    
+
     let cube = rubik::Cube::solved(&context, CubeAnimationOptions::default());
     let mut camera = Camera::new_perspective(
         Viewport::new_at_origo(width, height),
@@ -87,7 +87,7 @@ pub fn bind(canvas_element: HtmlCanvasElement, opts: Option<CanvasOptions>) -> R
         let t = input.time as f32;
         let dt = input.frame_time as f32;
 
-        let theta_speed = (t/10000.0).sin()/5000.0;
+        let theta_speed = (t/10000.0).sin()/2000.0;
         let phi_speed = (t/10000.0).cos()/8000.0;
         rotate_camera_around_target(&mut camera, Vec3::zero(), dt*theta_speed, dt*phi_speed);
 
