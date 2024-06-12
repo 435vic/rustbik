@@ -179,6 +179,8 @@ impl <'a> IntoIterator for Move {
 
 pub struct Cube {
     pub(crate) pieces: Vec<Piece>,
+    translation: Mat4,
+    rotation: Mat4,
     current_move: Option<Move>,
     current_face: Option<[usize; 9]>,
     move_start: f32,
@@ -263,6 +265,8 @@ impl Cube {
         }).collect::<Vec<_>>();
         Ok(Cube {
             pieces,
+            translation: Mat4::identity(),
+            rotation: Mat4::identity(),
             current_move: None,
             current_face: None,
             move_start: 0.0,
@@ -346,8 +350,7 @@ impl Cube {
             if elapsed > self.move_time {
                 for ci in cface {
                     let piece = &mut self.pieces[ci];
-                    piece.transform = mv.transform(1.0) * piece.transform;
-                    piece.transform(Mat4::identity());
+                    piece.set_local_transform(mv.transform(1.0) * piece.local_transform);
                 }
                 self.apply_move(mv);
                 // trace!("Applied move {:?}", mv);
@@ -356,7 +359,7 @@ impl Cube {
                 let x = crate::ease(elapsed / self.move_time, self.move_slope);
                 for ci in cface {
                     let piece = &mut self.pieces[ci];
-                    piece.transform(mv.transform(x));
+                    piece.animate(mv.transform(x));
                 }
             }
         } else if let Some(nmv) = self.move_queue.pop_front() {
@@ -365,6 +368,45 @@ impl Cube {
             self.move_start = time;
             // trace!("New move {:?} will affect {:?}", nmv, self.face_iter(nmv.face()).map(|c| c.cubelet()).collect::<Vec<_>>());
         }
+    }
+
+    pub fn translate(&mut self, translation: Vec3) {
+        let mat_translation = Mat4::from_translation(translation);
+        self.translation = mat_translation * self.translation;
+        self.update_transform();
+    }
+
+    pub fn set_translation(&mut self, translation: Vec3) {
+        let mat_translation = Mat4::from_translation(translation);
+        self.translation = mat_translation;
+        self.update_transform();
+    }
+
+    pub fn rotate(&mut self, theta: f32, phi: f32) {
+        let mat_rotation = Mat4::from_angle_y(Rad(theta)) * Mat4::from_angle_z(Rad(phi));
+        self.rotation = mat_rotation * self.rotation;
+        self.update_transform();
+    }
+
+    pub fn set_rotation(&mut self, theta: f32, phi: f32) {
+        let mat_rotation = Mat4::from_angle_y(Rad(theta)) * Mat4::from_angle_z(Rad(phi));
+        self.rotation = mat_rotation;
+        self.update_transform();
+    }
+
+    pub fn set_spacing(&mut self, spacing: f32) {
+        self.pieces.iter_mut().for_each(|p| {
+            p.spacing = spacing;
+            p.update_transform();
+        });
+    }
+
+    fn update_transform(&mut self) {
+        self.pieces.iter_mut().for_each(|p| {
+            p.set_global_transform(
+                self.translation * self.rotation
+            );
+        });
     }
 
     pub fn solved(ctx: &three_d::Context, anim: CubeAnimationOptions) -> Cube {

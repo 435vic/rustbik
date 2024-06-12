@@ -9,7 +9,10 @@ pub type PieceMaterial = RubikMaterial;
 pub struct Piece {
     position: (i32, i32, i32),
     color: (Color, Color, Color),
-    pub(crate) transform: Mat4,
+    pub(super) local_transform: Mat4,
+    pub(super) global_transform: Mat4,
+    pub(super) spacing: f32,
+    spacing_vec: Vec3,
     gm: Gm<Mesh, PieceMaterial>
 }
 
@@ -18,7 +21,10 @@ impl Piece {
         Piece {
             position,
             color,
-            transform: Mat4::identity(),
+            local_transform: Mat4::identity(),
+            global_transform: Mat4::identity(),
+            spacing: 0.0,
+            spacing_vec: Vec3::new(position.0 as f32, position.1 as f32, position.2 as f32),
             gm: Gm::new(mesh, PieceMaterial::default())
         }
     }
@@ -54,8 +60,28 @@ impl Piece {
         Ok((prev, new))
     }
 
-    pub fn transform(&mut self, mat: Mat4) {
-        self.gm.set_transformation(mat * self.transform);
+    pub fn animate(&mut self, transform: Mat4) {
+        let spacing = self.spacing();
+        self.gm.set_transformation(self.global_transform * transform * self.local_transform * spacing);
+    }
+
+    pub fn set_local_transform(&mut self, transform: Mat4) {
+        self.local_transform = transform;
+        self.update_transform();
+    }
+
+    pub fn set_global_transform(&mut self, transform: Mat4) {
+        self.global_transform = transform;
+        self.update_transform();
+    }
+
+    pub fn update_transform(&mut self) {
+        let spacing = self.spacing();
+        self.gm.set_transformation(self.global_transform * self.local_transform * spacing);
+    }
+
+    fn spacing(&self) -> Mat4 {
+        Mat4::from_translation(self.spacing_vec * self.spacing)
     }
 }
 

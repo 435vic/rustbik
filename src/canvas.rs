@@ -8,6 +8,9 @@ use wasm_bindgen::JsValue;
 use web_sys::{HtmlCanvasElement, Performance, WebGl2RenderingContext};
 use wasm_bindgen::JsCast;
 
+pub mod window;
+pub mod event_loop;
+
 fn request_animation_frame(closure: &Closure<dyn FnMut()>) {
     web_sys::window()
         .expect("Global window object should exist")
@@ -22,6 +25,12 @@ fn performance() -> Performance {
        .expect("Performance should exist")
 }
 
+fn scale_factor() -> f64 {
+    web_sys::window()
+        .expect("Global window object should exist")
+        .device_pixel_ratio()
+}
+
 pub struct ProgramInput {
     pub frame_time: f64,
     pub time: f64,
@@ -29,7 +38,7 @@ pub struct ProgramInput {
 
 /// A WebGL2 wrapper for a canvas element.
 pub struct Canvas {
-    canvas: HtmlCanvasElement,
+    raw: HtmlCanvasElement,
     context: Context,
 }
 
@@ -60,7 +69,7 @@ impl Canvas {
 
         Ok(
             Self {
-                canvas,
+                raw: canvas,
                 context: Context::from_gl_context(Arc::new(
                     context::Context::from_webgl2_context(wglctx),
                 )).map_err(|e| format!("three_d::core failed to create context: {:?}", e))?
@@ -73,7 +82,11 @@ impl Canvas {
     }
 
     pub fn logical_size(&self) -> (u32, u32) {
-        (self.canvas.client_width() as u32, self.canvas.client_height() as u32)
+        let scale = scale_factor();
+        (
+            (self.raw.client_width() as f64 * scale) as u32,
+            (self.raw.client_height() as f64 * scale) as u32
+        )
     }
 
     pub fn viewport(&self) -> Viewport {

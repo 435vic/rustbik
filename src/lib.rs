@@ -1,8 +1,10 @@
 pub mod rubik;
 pub mod canvas;
+pub mod log;
 
-use rubik::CubeAnimationOptions;
-use three_d::{Angle, Camera, ClearState, DirectionalLight, InnerSpace, Quaternion, Rad, RenderTarget, Srgba, Vec3, Viewport, Zero};
+use rubik::{CubeAnimationOptions, Move};
+use canvas::event_loop::EventLoop;
+use three_d::{Camera, ClearState, DirectionalLight, RenderTarget, Srgba, Vec3, Viewport};
 use wasm_bindgen::prelude::*;
 use web_sys::HtmlCanvasElement;
 
@@ -31,50 +33,21 @@ pub(crate) fn ease(t: f32, a: f32) -> f32 {
     t.powf(a) / (t.powf(a) + (1.0 - t).powf(a))
 }
 
-/// Rotate the camera around a given point by two angles (in radians),
-/// keeping the camera facing the point.
-pub fn rotate_camera_around_target(
-    camera: &mut Camera,
-    target: Vec3,
-    theta: f32,
-    phi: f32,
-) {
-    let distance = (target - camera.position()).magnitude();
-    let dir = (target - camera.position()).normalize();
-    let horizontal = dir.cross(*camera.up());
-    let vertical = horizontal.cross(dir);
-
-    for i in 0..2 {
-        let axis = if i == 0 { vertical } else { horizontal };
-        let angle = if i == 0 { theta } else { phi };
-        let new_position = rotate_around_axis(*camera.position(), axis, angle);
-        camera.set_view(new_position * distance, target, vertical.normalize());
-    }
-}
-
-/// Rotate a vector around an axis by a given angle in radians.
-pub fn rotate_around_axis(vector: Vec3, axis: Vec3, angle: f32) -> Vec3 {
-    let angle = Rad(angle / 2.0);
-    let q = Quaternion::from_sv(angle.cos(), angle.sin() * axis).normalize();
-    let p = Quaternion::from_sv(0.0, vector).normalize();
-    let rotated = (q * p * q.conjugate()).v;
-    rotated
-}
-
 #[wasm_bindgen]
 pub fn bind(canvas_element: HtmlCanvasElement, opts: Option<CanvasOptions>) -> Result<(), JsValue> {
     #[cfg(feature = "debug")]
     console_error_panic_hook::set_once();
 
-    let window = canvas::Canvas::new(canvas_element, opts.map(|o| o.into()))
-        .map_err(|e| JsValue::from(e))?;
-    let (width, height) = window.logical_size();
-    let context = window.gl();
+    let window = EventLoop::new(canvas_element, opts.map(|o| o.into()));
+    let (width, height) = window.canvas.logical_size();
+    let context = window.canvas.gl();
 
-    let cube = rubik::Cube::solved(&context, CubeAnimationOptions::default());
+    let mut cube = rubik::Cube::solved(&context, CubeAnimationOptions::default());
+    cube.set_translation(Vec3::new(0.0, 0.0, -3.0));
+    cube.queue(Move::from_sequence("U R2 F B R B2 R U2 L B2 R U' D' R2 F R' L B2 U2 F2").unwrap());
     let mut camera = Camera::new_perspective(
         Viewport::new_at_origo(width, height),
-        Vec3::new(5.0, 0.0, 5.0),
+        Vec3::new(8.0, 0.0, 0.0),
         Vec3::new(0.0, 0.0, 0.0),
         Vec3::new(0.0, 1.0, 0.0),
         three_d::degrees(45.0),
@@ -87,9 +60,14 @@ pub fn bind(canvas_element: HtmlCanvasElement, opts: Option<CanvasOptions>) -> R
         let t = input.time as f32;
         let dt = input.frame_time as f32;
 
-        let theta_speed = (t/10000.0).sin()/2000.0;
-        let phi_speed = (t/10000.0).cos()/8000.0;
-        rotate_camera_around_target(&mut camera, Vec3::zero(), dt*theta_speed, dt*phi_speed);
+        let theta_speed = (t/10000.0).sin()/8000.0;
+        let phi_speed = (t/10000.0).cos()/6000.0;
+        // let phi_speed = 0.0;
+        cube.rotate(dt*theta_speed, dt*phi_speed);
+
+        // rotate_camera_around_target(&mut camera, Vec3::zero(), dt*theta_speed, dt*phi_speed);
+
+        cube.animate(t);
 
         RenderTarget::screen(&context, width, height)
             .clear(ClearState::color_and_depth(0.0, 0.0, 0.0, 0.0, 1.0))
