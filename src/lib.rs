@@ -72,6 +72,8 @@ pub fn bind(canvas_element: HtmlCanvasElement, opts: Option<CanvasOptions>) -> R
         RenderTarget::screen(&context, width, height)
             .clear(ClearState::color_and_depth(0.0, 0.0, 0.0, 0.0, 1.0))
             .render(&camera, &cube, &[&light]);
+
+        camera.set_viewport(input.viewport);
     });
 
     Ok(())

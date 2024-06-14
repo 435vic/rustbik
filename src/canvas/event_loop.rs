@@ -11,7 +11,7 @@ use web_sys::js_sys::Object;
 use web_sys::{EventTarget, HtmlCanvasElement, ResizeObserverEntry, ResizeObserverSize};
 
 use super::window::window;
-use super::{performance, request_animation_frame, Canvas};
+use super::{performance, request_animation_frame, scale_factor, Canvas};
 use crate::{info, debug, error, trace};
 
 #[derive(Debug)]
@@ -28,10 +28,12 @@ pub struct ProgramInput {
     /// Milliseconds elapsed since the program started.
     pub time: f64,
     /// The current viewport.
-    viewport: Viewport,
+    pub viewport: Viewport,
     /// The current canvas size in physical pixels.
     /// On non-Safari browsers, this is the same as the logical size.
-    size: (u32, u32),
+    pub size: (u32, u32),
+    /// Unprocessed events in the event queue.
+    pub events: VecDeque<CanvasEvent>,
 }
 
 pub struct EventLoop {
@@ -75,16 +77,31 @@ impl EventLoop {
             self.elapsed_time += frame_time;
             self.last_frame_time = performance().now();
 
-            let event = match self.receiver.try_recv() {
-                Ok(event) => {
-                    debug!("Event: {:?}", event);
-                    Some(event)
-                },
-                Err(mpsc::TryRecvError::Empty) => None,
-                Err(mpsc::TryRecvError::Disconnected) => {
-                    panic!("EventLoop receiver disconnected");
+            // let event = match self.receiver.try_recv() {
+            //     Ok(event) => {
+            //         debug!("Event: {:?}", event);
+            //         Some(event)
+            //     },
+            //     Err(mpsc::TryRecvError::Empty) => None,
+            //     Err(mpsc::TryRecvError::Disconnected) => {
+            //         panic!("EventLoop receiver disconnected");
+            //     }
+            // };
+
+            let events: VecDeque<CanvasEvent> = self.receiver.try_iter().filter(|event| {
+                match event {
+                    CanvasEvent::Resize(width, height) => {
+                        if self.size == (*width, *height) {
+                            return false;
+                        };
+                        debug!("Event: {:?}", event);
+                        self.size = (*width, *height);
+                        self.viewport = Viewport::new_at_origo(*width, *height);
+                        false
+                    },
+                    _ => true,
                 }
-            };
+            }).collect();
 
             
             let input = ProgramInput {
@@ -92,6 +109,7 @@ impl EventLoop {
                 time: self.elapsed_time,
                 viewport: self.viewport,
                 size: self.size,
+                events
             };
             program(input);
             request_animation_frame(f.borrow().as_ref().unwrap());
@@ -102,7 +120,7 @@ impl EventLoop {
 
     fn register_events(&self) {
         let sender = self.sender.clone();
-        EventLoop::add_event("scroll", move |_event: web_sys::Event| {
+        EventLoop::add_event(&window(), "scroll", move |_event: web_sys::Event| {
             sender.send(
                 CanvasEvent::PageScroll(window().scroll_y().unwrap() as f32)
             ).unwrap();
@@ -111,7 +129,7 @@ impl EventLoop {
         let sender = self.sender.clone();
         // We're leaving all the ResizeObserver logic up to the javascript side of things.
         // This way we don't need to deal with creating the observer here.
-        EventLoop::add_event("rustbik_resize", move |event: web_sys::CustomEvent| {
+        EventLoop::add_event(&self.canvas.raw, "observer_resize", move |event: web_sys::CustomEvent| {
             let detail = event.detail();
             // Passing the whole entry as the detail property allows us to skip using Reflect
             // to get custom properties.
@@ -120,7 +138,10 @@ impl EventLoop {
                 let rect = entry.content_rect();
 
                 sender.send(
-                    CanvasEvent::Resize(rect.width() as u32, rect.height() as u32)
+                    CanvasEvent::Resize(
+                        (rect.width() as f64 * scale_factor()) as u32,
+                        (rect.height() as f64 * scale_factor()) as u32
+                    )
                 ).unwrap();
                 return;
             }
@@ -132,15 +153,13 @@ impl EventLoop {
         });
     }
 
-    // We'd need to use an Rc if we want to add an event listener to the canvas.
-    // Since there's only one canvas and it takes up the whole window, I think it's fine to
-    // use the window's events instead.
-    fn add_event<E, F> (name: &'static str, handler: F) where
+    fn add_event<U, E, F> (target: &U, name: &'static str, handler: F) where
+        U: AsRef<EventTarget>,
         F: 'static + FnMut(E),
         E: 'static + AsRef<web_sys::Event> + wasm_bindgen::convert::FromWasmAbi
     {
         let closure = Closure::wrap(Box::new(handler) as Box<dyn FnMut(E)>);
-        window()
+        target.as_ref()
             .add_event_listener_with_callback(name, closure.as_ref().unchecked_ref())
             .expect("should add event listener");
         closure.forget();
@@ -164,10 +183,10 @@ fn has_device_pixel_support() -> bool {
             let prototype = ResizeObserverEntryExt::prototype();
             let descriptor = Object::get_own_property_descriptor(
                 &prototype,
-                &JsValue::from_str("devicePixelContextBoxSize"),
+                &JsValue::from_str("devicePixelContentBoxSize"),
             );
             !descriptor.is_undefined()
-        }
+        };
     }
 
     DEVICE_PIXEL_SUPPORT.with(|support| *support)
