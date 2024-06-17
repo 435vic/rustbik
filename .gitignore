@@ -1,2 +1,5 @@
+# rust bare build output
 target
+
+# wasm-pack build output
 dist

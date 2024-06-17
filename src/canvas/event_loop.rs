@@ -94,10 +94,9 @@ impl EventLoop {
                         if self.size == (*width, *height) {
                             return false;
                         };
-                        debug!("Event: {:?}", event);
                         self.size = (*width, *height);
                         self.viewport = Viewport::new_at_origo(*width, *height);
-                        false
+                        true
                     },
                     _ => true,
                 }
