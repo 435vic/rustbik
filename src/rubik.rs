@@ -8,6 +8,8 @@ mod graphics;
 use piece::Piece;
 use graphics::cube_uvs;
 
+const PLUSHIE: &[u8] = include_bytes!("../assets/v1plush.glb");
+
 const COLORS: [Srgba; 6] = [
     Srgba::new(31, 68, 166, 255), // blue
     Srgba::new(248, 214, 73, 255), //yellow
@@ -179,6 +181,7 @@ impl <'a> IntoIterator for Move {
 
 pub struct Cube {
     pub(crate) pieces: Vec<Piece>,
+    core: three_d::Model<three_d::ColorMaterial>,
     translation: Mat4,
     rotation: Mat4,
     current_move: Option<Move>,
@@ -263,10 +266,16 @@ impl Cube {
             mesh.colors = Some(face_colors);
             Piece::new(position, color, Mesh::new(&ctx, &mesh))
         }).collect::<Vec<_>>();
+
+        let mut assets = three_d_asset::io::RawAssets::new();
+        assets.insert("plushie.glb", PLUSHIE.to_vec());
+        let plushie_model = assets.deserialize("plushie.glb").unwrap();
+
         Ok(Cube {
             pieces,
             translation: Mat4::identity(),
             rotation: Mat4::identity(),
+            core: three_d::Model::new(ctx, &plushie_model).unwrap(),
             current_move: None,
             current_face: None,
             move_start: 0.0,
@@ -407,6 +416,11 @@ impl Cube {
                 self.translation * self.rotation
             );
         });
+        self.core.iter_mut().for_each(|m| {
+            m.set_transformation(
+                self.translation * self.rotation * Mat4::from_scale(3.0)
+            );
+        });
     }
 
     pub fn solved(ctx: &three_d::Context, anim: CubeAnimationOptions) -> Cube {
@@ -420,7 +434,9 @@ impl<'a> IntoIterator for &'a Cube {
 
     fn into_iter(self) -> Self::IntoIter {
         self.pieces.iter()
-            .map(|p| p as &dyn Object)
+            .enumerate()
+            .filter_map(|(i, p)| if i != 13 { Some(p as &dyn Object) } else { None })
+            .chain(self.core.iter().map(|m| m as &dyn Object))
             .collect::<Vec<_>>()
             .into_iter()
     }

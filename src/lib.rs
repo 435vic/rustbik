@@ -9,7 +9,7 @@ use animation::{SecondOrderSystem, SecondOrderSystemParameters};
 use canvas::window::scale_factor;
 use rubik::{CubeAnimationOptions, Move};
 use canvas::event_loop::{EventLoop, CanvasEvent};
-use three_d::{Camera, ClearState, DirectionalLight, RenderTarget, Srgba, Vec3, Viewport};
+use three_d::{Camera, ClearState, ColorMaterial, DirectionalLight, PhysicalMaterial, RenderTarget, Srgba, Vec3, Viewport};
 use wasm_bindgen::prelude::*;
 use web_sys::console::debug;
 use web_sys::HtmlCanvasElement;
@@ -40,7 +40,7 @@ pub(crate) fn ease(t: f32, a: f32) -> f32 {
 }
 
 #[wasm_bindgen]
-pub fn bind(canvas_element: HtmlCanvasElement, opts: Option<CanvasOptions>) -> Result<(), JsValue> {
+pub async fn bind(canvas_element: HtmlCanvasElement, opts: Option<CanvasOptions>) -> Result<(), JsValue> {
     #[cfg(feature = "debug")]
     console_error_panic_hook::set_once();
 
