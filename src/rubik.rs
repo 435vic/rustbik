@@ -1,5 +1,6 @@
 use std::collections::VecDeque;
 
+use lazy_static::lazy_static;
 use three_d::{CpuMesh, Mat3, Mat4, Mesh, Object, Rad, SquareMatrix, Srgba, Vec3};
 
 mod piece;
@@ -63,6 +64,10 @@ pub const ROT_YZ_CCW: Mat3 = Mat3::new(
     -1.0, 0.0, 0.0,
     0.0, 0.0, 1.0
 );
+
+lazy_static! {
+    static ref PLUSH_TRANSFORM: Mat4 = Mat4::from_translation(Vec3::new(0.0, -0.3, 0.0)) * Mat4::from_scale(3.0);
+}
 
 /// Rubik's cube standard colors.
 /// None represents the color between cubelet faces that aren't visible.
@@ -182,6 +187,7 @@ impl <'a> IntoIterator for Move {
 pub struct Cube {
     pub(crate) pieces: Vec<Piece>,
     core: three_d::Model<three_d::ColorMaterial>,
+    axes: three_d::Axes,
     translation: Mat4,
     rotation: Mat4,
     current_move: Option<Move>,
@@ -269,13 +275,15 @@ impl Cube {
 
         let mut assets = three_d_asset::io::RawAssets::new();
         assets.insert("plushie.glb", PLUSHIE.to_vec());
-        let plushie_model = assets.deserialize("plushie.glb").unwrap();
+        let plushie_asset = assets.deserialize("plushie.glb").unwrap();
+        let mut plushie = three_d::Model::new(ctx, &plushie_asset).unwrap();
 
         Ok(Cube {
             pieces,
             translation: Mat4::identity(),
             rotation: Mat4::identity(),
-            core: three_d::Model::new(ctx, &plushie_model).unwrap(),
+            core: plushie,
+            axes: three_d::Axes::new(ctx, 0.02, 2.8),
             current_move: None,
             current_face: None,
             move_start: 0.0,
@@ -418,9 +426,13 @@ impl Cube {
         });
         self.core.iter_mut().for_each(|m| {
             m.set_transformation(
-                self.translation * self.rotation * Mat4::from_scale(3.0)
+                self.translation * self.rotation * *PLUSH_TRANSFORM
             );
         });
+
+        self.axes.set_transformation(
+            self.translation * self.rotation
+        );
     }
 
     pub fn solved(ctx: &three_d::Context, anim: CubeAnimationOptions) -> Cube {
@@ -436,7 +448,8 @@ impl<'a> IntoIterator for &'a Cube {
         self.pieces.iter()
             .enumerate()
             .filter_map(|(i, p)| if i != 13 { Some(p as &dyn Object) } else { None })
-            .chain(self.core.iter().map(|m| m as &dyn Object))
+            .chain(&self.core)
+            //.chain(&self.axes)
             .collect::<Vec<_>>()
             .into_iter()
     }

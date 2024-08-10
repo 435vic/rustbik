@@ -8,8 +8,8 @@ use std::borrow::BorrowMut;
 use animation::{SecondOrderSystem, SecondOrderSystemParameters};
 use canvas::window::scale_factor;
 use rubik::{CubeAnimationOptions, Move};
-use canvas::event_loop::{EventLoop, CanvasEvent};
-use three_d::{Camera, ClearState, ColorMaterial, DirectionalLight, PhysicalMaterial, RenderTarget, Srgba, Vec3, Viewport};
+use canvas::event_loop::{CanvasEvent, EventLoop, MouseButton};
+use three_d::{Axes, Camera, ClearState, ColorMaterial, DirectionalLight, InnerSpace, PhysicalMaterial, RenderTarget, Srgba, Vec2, Vec3, Viewport};
 use wasm_bindgen::prelude::*;
 use web_sys::console::debug;
 use web_sys::HtmlCanvasElement;
@@ -60,6 +60,7 @@ pub async fn bind(canvas_element: HtmlCanvasElement, opts: Option<CanvasOptions>
         0.0,
     );
 
+
     let mut cube = rubik::Cube::solved(&context, CubeAnimationOptions::default());
     cube.set_translation(cube_pos_wide);
     cube.queue(Move::from_sequence("U R2 F B R B2 R U2 L B2 R U' D' R2 F R' L B2 U2 F2").unwrap());
@@ -76,11 +77,15 @@ pub async fn bind(canvas_element: HtmlCanvasElement, opts: Option<CanvasOptions>
 
     let mut phone = (window.canvas.logical_size().0 as f64 / scale_factor()) <= 480.0;
     let mut scroll_y = 0.0;
+    let mut user_rotation = Vec2::new(0.0, 0.0);
+    let mut mouse_pressed = false;
 
     cube.set_translation(if phone { cube_pos_narrow } else { cube_pos_wide });
     cube.rotate(1.0, 1.0);
 
     window.run(move |input| {
+        let mut mouse_delta: Option<Vec2> = None;
+
         for event in input.events {
             match event {
                 CanvasEvent::Resize(width, _) => {
@@ -91,6 +96,18 @@ pub async fn bind(canvas_element: HtmlCanvasElement, opts: Option<CanvasOptions>
                 CanvasEvent::PageScroll(pos) => {
                     scroll_y = pos;
                 },
+                CanvasEvent::PointerMove(x, y, Some(MouseButton::Left)) => {
+                    mouse_delta = Some(Vec2::new(x as f32, -y as f32));
+                },
+                CanvasEvent::PointerDown(MouseButton::Left) => {
+                    mouse_pressed = true;
+                    debug!("mouse_pressed: {}", mouse_pressed);
+                },
+                CanvasEvent::PointerUp(MouseButton::Left) => {
+                    mouse_pressed = false;
+                    debug!("mouse_pressed: {}", mouse_pressed);
+                },
+                _ => {}
             }
         }
 
@@ -98,6 +115,18 @@ pub async fn bind(canvas_element: HtmlCanvasElement, opts: Option<CanvasOptions>
         let dt = input.frame_time as f32;
 
         smooth_scroll.update(dt / 1000.0, scroll_y);
+
+        if let Some(delta) = mouse_delta {
+            user_rotation += delta/10.0 * 0.008;
+            user_rotation.x = user_rotation.x.clamp(-100.0, 100.0);
+            user_rotation.y = user_rotation.y.clamp(-100.0, 100.0);
+        }
+
+        if user_rotation.magnitude() > 0.001 {
+            user_rotation *= 1.0 - if mouse_pressed { 0.2 } else { 0.025 };
+            cube.rotate(user_rotation.x, user_rotation.y);
+        }
+
         cube.set_spacing({
             let capped_zoom = (smooth_scroll.value() / 60.0).max(0.0);
             let thresh = 2.8;
@@ -111,7 +140,9 @@ pub async fn bind(canvas_element: HtmlCanvasElement, opts: Option<CanvasOptions>
         let theta_speed = (t/10000.0).sin()/8000.0;
         let phi_speed = (t/10000.0).cos()/6000.0;
         // let phi_speed = 0.0;
-        cube.rotate(dt*theta_speed, dt*phi_speed);
+        if !mouse_pressed {
+            cube.rotate(dt*theta_speed, dt*phi_speed);
+        }
 
         // rotate_camera_around_target(&mut camera, Vec3::zero(), dt*theta_speed, dt*phi_speed);
 

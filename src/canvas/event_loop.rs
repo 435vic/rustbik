@@ -8,7 +8,7 @@ use wasm_bindgen::prelude::*;
 use wasm_bindgen::closure::Closure;
 use wasm_bindgen::{JsCast, JsValue};
 use web_sys::js_sys::Object;
-use web_sys::{EventTarget, HtmlCanvasElement, ResizeObserverEntry, ResizeObserverSize};
+use web_sys::{EventTarget, HtmlCanvasElement, MouseEvent, ResizeObserverEntry, ResizeObserverSize};
 
 use super::window::window;
 use super::{performance, request_animation_frame, scale_factor, Canvas};
@@ -19,6 +19,16 @@ pub enum CanvasEvent {
     PageScroll(f32),
     Resize(u32, u32),
     // TODO: pointer events (and maybe keyboard??)
+    PointerMove(f32, f32, Option<MouseButton>),
+    PointerDown(MouseButton),
+    PointerUp(MouseButton),
+}
+
+#[derive(Debug)]
+pub enum MouseButton {
+    Left,
+    Middle,
+    Right
 }
 
 /// Represents the input to a program.
@@ -148,6 +158,54 @@ impl EventLoop {
             let entry: ResizeObserverSize = entry.device_pixel_content_box_size().get(0).unchecked_into();
             sender.send(
                 CanvasEvent::Resize(entry.inline_size() as u32, entry.block_size() as u32)
+            ).unwrap();
+        });
+
+        let sender = self.sender.clone();
+        EventLoop::add_event(&self.canvas.raw, "mousemove_fwd", move |event: web_sys::CustomEvent| {
+            let event: MouseEvent = event.detail().dyn_into().expect("Should be a MouseEvent");
+            // debug!("Mouse move, button: {:?}", event.buttons());
+            sender.send(
+                CanvasEvent::PointerMove(
+                    event.movement_x() as f32,
+                    event.movement_y() as f32,
+                    match event.buttons() {
+                        1 => Some(MouseButton::Left),
+                        2 => Some(MouseButton::Right),
+                        4 => Some(MouseButton::Middle),
+                        _ => None
+                    },
+                )
+            ).unwrap();
+        });
+
+        let sender = self.sender.clone();
+        EventLoop::add_event(&self.canvas.raw, "mousedown_fwd", move |event: web_sys::CustomEvent| {
+            let event: MouseEvent = event.detail().dyn_into().expect("Should be a MouseEvent");
+            sender.send(
+                CanvasEvent::PointerDown (
+                    match event.button() {
+                        0 => MouseButton::Left,
+                        1 => MouseButton::Middle,
+                        2 => MouseButton::Right,
+                        _ => MouseButton::Left
+                    }
+                )
+            ).unwrap();
+        });
+
+        let sender = self.sender.clone();
+        EventLoop::add_event(&self.canvas.raw, "mouseup_fwd", move |event: web_sys::CustomEvent| {
+            let event: MouseEvent = event.detail().dyn_into().expect("Should be a MouseEvent");
+            sender.send(
+                CanvasEvent::PointerUp (
+                    match event.button() {
+                        0 => MouseButton::Left,
+                        1 => MouseButton::Middle,
+                        2 => MouseButton::Right,
+                        _ => MouseButton::Left
+                    }
+                )
             ).unwrap();
         });
     }
